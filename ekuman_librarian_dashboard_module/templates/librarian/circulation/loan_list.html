@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Circulation Register{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">Circulation Register</h3>
+        <p class="text-muted mb-0">Active book issues, due dates, and return processing ($0.50/day overdue fine)</p>
+    </div>
+    <a href="{% url 'librarian:dashboard' %}" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<!-- Filter Tabs -->
+<div class="btn-group mb-4" role="group" aria-label="Loan filters">
+    <a href="{% url 'librarian:loan_list' %}" class="btn btn-sm {% if filter_type == 'all' %}btn-dark{% else %}btn-light border{% endif %}">All Loans</a>
+    <a href="{% url 'librarian:loan_list' %}?filter=active" class="btn btn-sm {% if filter_type == 'active' %}btn-dark{% else %}btn-light border{% endif %}">Active</a>
+    <a href="{% url 'librarian:loan_list' %}?filter=overdue" class="btn btn-sm {% if filter_type == 'overdue' %}btn-dark{% else %}btn-light border{% endif %}">Overdue</a>
+    <a href="{% url 'librarian:loan_list' %}?filter=returned" class="btn btn-sm {% if filter_type == 'returned' %}btn-dark{% else %}btn-light border{% endif %}">Returned</a>
+</div>
+
+<!-- Loans Table -->
+<div class="card card-custom p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle table-custom mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Book Title</th>
+                    <th>Accession Number</th>
+                    <th>Borrower</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th class="text-end pe-4">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for loan in page_obj %}
+                    <tr>
+                        <td class="ps-4 fw-semibold">{{ loan.book_copy.book.title }}</td>
+                        <td><code class="text-dark">{{ loan.book_copy.accession_number }}</code></td>
+                        <td>
+                            <span class="fw-semibold">{{ loan.borrower.get_full_name|default:loan.borrower.username }}</span>
+                            <small class="d-block text-muted">{{ loan.borrower.student_id|default:"Staff" }}</small>
+                        </td>
+                        <td class="text-muted fs-7">{{ loan.issue_date|date:"Y-m-d" }}</td>
+                        <td class="fs-7 {% if loan.status == 'OVERDUE' or loan.is_overdue %}text-danger fw-bold{% endif %}">{{ loan.due_date|date:"Y-m-d" }}</td>
+                        <td>
+                            {% if loan.status == 'RETURNED' %}
+                                <span class="badge bg-success bg-opacity-10 text-success px-2 py-1">Returned</span>
+                            {% elif loan.status == 'OVERDUE' or loan.is_overdue %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger px-2 py-1">Overdue</span>
+                            {% else %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            {% if loan.status != 'RETURNED' %}
+                                <form action="{% url 'librarian:loan_return' loan.id %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success">
+                                        <i class="bi bi-arrow-return-left me-1"></i> Return
+                                    </button>
+                                </form>
+                            {% else %}
+                                <span class="text-muted fs-7">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                            No loans match the selected filter.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Footer -->
+    {% if page_obj.has_other_pages %}
+        <div class="card-footer bg-white border-top p-3 d-flex align-items-center justify-content-between">
+            <span class="text-muted fs-7">Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} loans</span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&filter={{ filter_type }}">Previous</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                {% endif %}
+
+                {% for i in page_obj.paginator.page_range %}
+                    <li class="page-item {% if page_obj.number == i %}active{% endif %}">
+                        <a class="page-link" href="?page={{ i }}&filter={{ filter_type }}">{{ i }}</a>
+                    </li>
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&filter={{ filter_type }}">Next</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">Next</span></li>
+                {% endif %}
+            </ul>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
