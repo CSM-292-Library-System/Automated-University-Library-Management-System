@@ -27,7 +27,7 @@
             <select name="role" class="form-select" onchange="this.form.submit()">
                 <option value="">All Roles</option>
                 <option value="STUDENT" {% if role_filter == 'STUDENT' %}selected{% endif %}>Students</option>
-                <option value="LIBRARIAN" {% if role_filter == 'LIBRARIAN' %}selected{% endif %}>Librarians</option>
+                <option value="STAFF" {% if role_filter == 'STAFF' %}selected{% endif %}>Staff</option>
             </select>
         </div>
 
@@ -81,8 +81,8 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if user_obj.role == 'LIBRARIAN' %}
-                                <span class="badge bg-secondary bg-opacity-10 text-dark border"><i class="bi bi-shield-lock me-1"></i> Librarian</span>
+                            {% if user_obj.role == 'STAFF' %}
+                                <span class="badge bg-secondary bg-opacity-10 text-dark border"><i class="bi bi-shield-lock me-1"></i> Staff</span>
                             {% else %}
                                 <span class="badge bg-info bg-opacity-10 text-info border"><i class="bi bi-person me-1"></i> Student</span>
                             {% endif %}

@@ -2,21 +2,18 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User
-from catalog.models import Book, Category, BookCopy
+from catalog.models import Book, BookCopy
 from circulation.models import Loan, Fine
 from datetime import timedelta
 
 class LibrarianDashboardTests(TestCase):
     def setUp(self):
-        # Create Category
-        self.category = Category.objects.create(name="Computer Science", icon_name="bi-code-slash")
-        
         # Create Librarian User
         self.librarian = User.objects.create_user(
             username='lib_admin',
             email='admin@library.edu',
             password='password123',
-            role='LIBRARIAN',
+            role='STAFF',
             is_staff=True
         )
         
@@ -35,9 +32,7 @@ class LibrarianDashboardTests(TestCase):
             title="Clean Code",
             author="Robert C. Martin",
             isbn="978-0132350884",
-            category=self.category,
-            total_copies=3,
-            available_copies=2
+            category="Computer Science"
         )
         self.copy = BookCopy.objects.create(book=self.book, accession_number="978-0132350884-001", status="BORROWED")
 
@@ -87,12 +82,11 @@ class LibrarianDashboardTests(TestCase):
             'title': 'Design Patterns',
             'author': 'Erich Gamma',
             'isbn': '978-0201633610',
-            'category': self.category.pk,
+            'category': 'Software Engineering',
             'publisher': 'Addison-Wesley',
             'publication_year': 1994,
-            'total_copies': 2,
-            'available_copies': 2,
             'description': 'Elements of Reusable Object-Oriented Software',
+            'copies_to_add': 2,
         })
         self.assertEqual(Book.objects.filter(isbn='978-0201633610').exists(), True)
         book = Book.objects.get(isbn='978-0201633610')

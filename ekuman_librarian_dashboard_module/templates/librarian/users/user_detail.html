@@ -40,8 +40,8 @@
                     <tr>
                         <td class="text-muted">Role</td>
                         <td>
-                            {% if member.role == 'LIBRARIAN' %}
-                                <span class="badge bg-secondary bg-opacity-10 text-dark border"><i class="bi bi-shield-lock me-1"></i> Librarian</span>
+                            {% if member.role == 'STAFF' %}
+                                <span class="badge bg-secondary bg-opacity-10 text-dark border"><i class="bi bi-shield-lock me-1"></i> Staff</span>
                             {% else %}
                                 <span class="badge bg-info bg-opacity-10 text-info border"><i class="bi bi-person me-1"></i> Student</span>
                             {% endif %}
@@ -61,7 +61,7 @@
                     </tr>
                     <tr>
                         <td class="text-muted">Phone</td>
-                        <td class="fs-7">{{ member.phone|default:"N/A" }}</td>
+                        <td class="fs-7">{{ member.phone_number|default:"N/A" }}</td>
                     </tr>
                     <tr>
                         <td class="text-muted">Account</td>

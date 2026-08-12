@@ -1,15 +1,15 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 from django.core.paginator import Paginator
 from django.utils import timezone
 from functools import wraps
 
-from catalog.models import Book, Category, BookCopy
+from catalog.models import Book, BookCopy
 from accounts.models import User
 from circulation.models import Loan, Fine
-from .forms import BookForm, CategoryForm, UserManagementForm, FinePaymentForm
+from .forms import BookForm, FinePaymentForm
 
 def librarian_access_required(view_func):
     @wraps(view_func)
@@ -37,11 +37,13 @@ def dashboard_overview(request):
     overdue_loans_count = Loan.objects.exclude(status='RETURNED').filter(due_date__lt=today).count()
     
     total_students = User.objects.filter(role='STUDENT').count()
-    total_librarians = User.objects.filter(role='LIBRARIAN').count()
+    total_librarians = User.objects.filter(role='STAFF').count()
     
     unpaid_fines = Fine.objects.filter(is_paid=False).aggregate(total=Sum('amount'))['total'] or 0.00
     
-    low_stock_books = Book.objects.filter(available_copies__lte=1).order_by('available_copies')[:5]
+    low_stock_books = Book.objects.annotate(
+        available_copies=Count('copies', filter=Q(copies__status='AVAILABLE'))
+    ).filter(available_copies__lte=1).order_by('available_copies')[:5]
     recent_loans = Loan.objects.select_related('borrower', 'book_copy__book').order_by('-issue_date')[:6]
     recent_users = User.objects.order_by('-date_joined')[:5]
     
@@ -71,10 +73,13 @@ def dashboard_overview(request):
 def book_list(request):
     """View and search book catalog"""
     query = request.GET.get('q', '').strip()
-    category_id = request.GET.get('category', '')
+    category_filter = request.GET.get('category', '')
     stock_status = request.GET.get('stock', '')
 
-    books = Book.objects.select_related('category').all()
+    books = Book.objects.annotate(
+        available_copies=Count('copies', filter=Q(copies__status='AVAILABLE')),
+        total_copies=Count('copies'),
+    )
 
     if query:
         books = books.filter(
@@ -84,8 +89,8 @@ def book_list(request):
             Q(publisher__icontains=query)
         )
 
-    if category_id:
-        books = books.filter(category_id=category_id)
+    if category_filter:
+        books = books.filter(category=category_filter)
 
     if stock_status == 'available':
         books = books.filter(available_copies__gt=0)
@@ -96,13 +101,13 @@ def book_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    categories = Category.objects.all()
+    categories = list(Book.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
 
     context = {
         'page_obj': page_obj,
         'categories': categories,
         'query': query,
-        'selected_category': category_id,
+        'selected_category': category_filter,
         'selected_stock': stock_status,
         'total_count': books.count(),
         'active_nav': 'catalog',
@@ -118,17 +123,17 @@ def book_create(request):
         form = BookForm(request.POST)
         if form.is_valid():
             book = form.save()
-            for i in range(1, book.total_copies + 1):
-                accession_number = f"{book.isbn}-{i:03d}"
+            copies_count = form.cleaned_data.get('copies_to_add') or 0
+            for i in range(1, copies_count + 1):
                 BookCopy.objects.create(
                     book=book,
-                    accession_number=accession_number,
+                    accession_number=f"{book.isbn}-{i:03d}",
                     status='AVAILABLE'
                 )
-            messages.success(request, f'Book "{book.title}" added successfully with {book.total_copies} copy(ies).')
+            messages.success(request, f'Book "{book.title}" added successfully with {copies_count} copy(ies).')
             return redirect('librarian:book_detail', pk=book.pk)
     else:
-        form = BookForm()
+        form = BookForm(initial={'copies_to_add': 1})
 
     return render(request, 'librarian/catalog/book_form.html', {
         'form': form,
@@ -142,24 +147,23 @@ def book_create(request):
 def book_update(request, pk):
     """Edit existing book details"""
     book = get_object_or_404(Book, pk=pk)
-    old_copies = book.total_copies
 
     if request.method == 'POST':
         form = BookForm(request.POST, instance=book)
         if form.is_valid():
             updated_book = form.save()
-            if updated_book.total_copies > old_copies:
-                for i in range(old_copies + 1, updated_book.total_copies + 1):
-                    accession_number = f"{updated_book.isbn}-{i:03d}"
-                    BookCopy.objects.create(
-                        book=updated_book,
-                        accession_number=accession_number,
-                        status='AVAILABLE'
-                    )
+            extra_copies = form.cleaned_data.get('copies_to_add') or 0
+            existing_count = updated_book.copies.count()
+            for i in range(existing_count + 1, existing_count + extra_copies + 1):
+                BookCopy.objects.create(
+                    book=updated_book,
+                    accession_number=f"{updated_book.isbn}-{i:03d}",
+                    status='AVAILABLE'
+                )
             messages.success(request, f'Book "{updated_book.title}" updated successfully.')
             return redirect('librarian:book_detail', pk=updated_book.pk)
     else:
-        form = BookForm(instance=book)
+        form = BookForm(instance=book, initial={'copies_to_add': 0})
 
     return render(request, 'librarian/catalog/book_form.html', {
         'form': form,
@@ -173,7 +177,13 @@ def book_update(request, pk):
 @librarian_access_required
 def book_detail(request, pk):
     """View book details and copy inventory"""
-    book = get_object_or_404(Book.objects.select_related('category'), pk=pk)
+    book = get_object_or_404(
+        Book.objects.annotate(
+            available_copies=Count('copies', filter=Q(copies__status='AVAILABLE')),
+            total_copies=Count('copies'),
+        ),
+        pk=pk,
+    )
     copies = book.copies.all()
     active_loans = Loan.objects.filter(book_copy__book=book).exclude(status='RETURNED').select_related('borrower', 'book_copy')
 
@@ -354,24 +364,7 @@ def loan_return(request, loan_id):
     loan = get_object_or_404(Loan, pk=loan_id)
     if request.method == 'POST':
         if loan.status != 'RETURNED':
-            loan.status = 'RETURNED'
-            loan.return_date = timezone.now()
-            loan.save()
-
-            copy = loan.book_copy
-            copy.status = 'AVAILABLE'
-            copy.save()
-
-            book = copy.book
-            book.available_copies += 1
-            book.save()
-
-            if loan.return_date > loan.due_date:
-                overdue_days = (loan.return_date - loan.due_date).days
-                fine_amount = overdue_days * 0.50
-                Fine.objects.create(loan=loan, amount=fine_amount, is_paid=False)
-                messages.warning(request, f'Book returned. Generated overdue fine of ${fine_amount:.2f} ({overdue_days} days overdue).')
-            else:
-                messages.success(request, f'Book "{book.title}" marked as returned successfully.')
+            loan.mark_returned()
+            messages.success(request, f'Book "{loan.book_copy.book.title}" marked as returned successfully.')
 
     return redirect('librarian:loan_list')
