@@ -26,6 +26,9 @@ urlpatterns = [
     # Reports  (overdue list, borrowing stats, inventory)
     path("reports/", include("apps.reports.urls", namespace="reports")),
 
+    # Notifications  (on-site overdue alerts, return confirmations)
+    path("notifications/", include("apps.notifications.urls", namespace="notifications")),
+
     # Default route → redirect to catalog
     path("", home_redirect, name="home"),
 ]
