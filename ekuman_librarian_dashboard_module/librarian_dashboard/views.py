@@ -6,10 +6,10 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from functools import wraps
 
-from catalog.models import Book, BookCopy
+from catalog.models import Book, Category, BookCopy
 from accounts.models import User
 from circulation.models import Loan, Fine
-from .forms import BookForm, FinePaymentForm
+from .forms import BookForm, CategoryForm, UserManagementForm, FinePaymentForm
 
 def librarian_access_required(view_func):
     @wraps(view_func)
@@ -73,10 +73,10 @@ def dashboard_overview(request):
 def book_list(request):
     """View and search book catalog"""
     query = request.GET.get('q', '').strip()
-    category_filter = request.GET.get('category', '')
+    category_id = request.GET.get('category', '')
     stock_status = request.GET.get('stock', '')
 
-    books = Book.objects.annotate(
+    books = Book.objects.select_related('category').annotate(
         available_copies=Count('copies', filter=Q(copies__status='AVAILABLE')),
         total_copies=Count('copies'),
     )
@@ -89,8 +89,8 @@ def book_list(request):
             Q(publisher__icontains=query)
         )
 
-    if category_filter:
-        books = books.filter(category=category_filter)
+    if category_id:
+        books = books.filter(category_id=category_id)
 
     if stock_status == 'available':
         books = books.filter(available_copies__gt=0)
@@ -101,13 +101,13 @@ def book_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    categories = list(Book.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+    categories = Category.objects.all()
 
     context = {
         'page_obj': page_obj,
         'categories': categories,
         'query': query,
-        'selected_category': category_filter,
+        'selected_category': category_id,
         'selected_stock': stock_status,
         'total_count': books.count(),
         'active_nav': 'catalog',
@@ -178,7 +178,7 @@ def book_update(request, pk):
 def book_detail(request, pk):
     """View book details and copy inventory"""
     book = get_object_or_404(
-        Book.objects.annotate(
+        Book.objects.select_related('category').annotate(
             available_copies=Count('copies', filter=Q(copies__status='AVAILABLE')),
             total_copies=Count('copies'),
         ),

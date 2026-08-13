@@ -39,7 +39,7 @@
                         <td>
                             {% if book.category %}
                                 <span class="badge bg-secondary bg-opacity-10 text-dark border">
-                                    <i class="bi bi-tag me-1"></i> {{ book.category }}
+                                    <i class="bi {{ book.category.icon_name }} me-1"></i> {{ book.category.name }}
                                 </span>
                             {% else %}
                                 <span class="text-muted fs-7">Uncategorized</span>

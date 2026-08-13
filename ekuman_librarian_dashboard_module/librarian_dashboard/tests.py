@@ -2,12 +2,15 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User
-from catalog.models import Book, BookCopy
+from catalog.models import Book, Category, BookCopy
 from circulation.models import Loan, Fine
 from datetime import timedelta
 
 class LibrarianDashboardTests(TestCase):
     def setUp(self):
+        # Create Category
+        self.category = Category.objects.create(name="Computer Science", icon_name="bi-code-slash")
+        
         # Create Librarian User
         self.librarian = User.objects.create_user(
             username='lib_admin',
@@ -32,7 +35,7 @@ class LibrarianDashboardTests(TestCase):
             title="Clean Code",
             author="Robert C. Martin",
             isbn="978-0132350884",
-            category="Computer Science"
+            category=self.category
         )
         self.copy = BookCopy.objects.create(book=self.book, accession_number="978-0132350884-001", status="BORROWED")
 
@@ -82,7 +85,7 @@ class LibrarianDashboardTests(TestCase):
             'title': 'Design Patterns',
             'author': 'Erich Gamma',
             'isbn': '978-0201633610',
-            'category': 'Software Engineering',
+            'category': self.category.pk,
             'publisher': 'Addison-Wesley',
             'publication_year': 1994,
             'description': 'Elements of Reusable Object-Oriented Software',

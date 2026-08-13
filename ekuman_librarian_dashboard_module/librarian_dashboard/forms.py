@@ -1,5 +1,5 @@
 from django import forms
-from catalog.models import Book, BookCopy
+from catalog.models import Book, Category, BookCopy
 from accounts.models import User
 from circulation.models import Fine
 
@@ -19,11 +19,21 @@ class BookForm(forms.ModelForm):
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Introduction to Algorithms'}),
             'author': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Thomas H. Cormen'}),
             'isbn': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 978-0262033848'}),
-            'category': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Computer Science'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
             'publisher': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. MIT Press'}),
             'publication_year': forms.NumberInput(attrs={'class': 'form-control'}),
             'cover_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://images.unsplash.com/...'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Enter book summary...'}),
+        }
+
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ['name', 'description', 'icon_name']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'icon_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'bi-journal-code'}),
         }
 
 class UserManagementForm(forms.ModelForm):

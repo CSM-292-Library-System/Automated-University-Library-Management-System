@@ -109,7 +109,8 @@ urlpatterns = [
 ### Step 4: Model Dependencies Required
 The views in this module query the following models (defined by Team D / Catalog & Circulation module leads):
 - **`accounts.User`**: Custom `AbstractUser` model with `role` (`'STUDENT'` / `'LECTURER'` / `'OUTSIDER'` / `'STAFF'`), `identification_number`, `student_id`, `department`, `phone_number`, `is_active`, and a helper method `is_librarian()` (returns `self.role == 'STAFF'`).
-- **`catalog.Book`**: Must have `title`, `author`, `isbn`, `category` (plain `CharField` — not a FK), `publisher`, `publication_year`, `cover_url`, `description`. Copy counts are **not** stored on `Book` — the dashboard derives `available_copies` / `total_copies` by annotating `BookCopy` rows by status.
+- **`catalog.Book`**: Must have `title`, `author`, `isbn`, `category` (**FK to `catalog.Category`**), `publisher`, `publication_year`, `cover_url`, `description`. Copy counts are **not** stored on `Book` — the dashboard derives `available_copies` / `total_copies` by annotating `BookCopy` rows by status.
+- **`catalog.Category`**: Must have `name`, `description`, `icon_name`.
 - **`catalog.BookCopy`**: Must have `book` (FK with `related_name='copies'`), `accession_number`, `status` (`'AVAILABLE'` / `'BORROWED'` / `'MAINTENANCE'`).
 - **`circulation.Loan`**: Must have `borrower`, `book_copy`, `issue_date`, `due_date`, `return_date`, `status` (`'ACTIVE'`, `'RETURNED'`, `'OVERDUE'`), property `is_overdue`, and a `mark_returned()` method that sets the status, return date, copy status, and overdue fine.
 - **`circulation.Fine`**: Must have `loan`, `amount`, `is_paid`, `paid_at`.
@@ -128,12 +129,14 @@ Aligned with the locked schema (Scaffold C / `Library_management_system.sql`) an
 | Loan statuses    | `'ACTIVE'` / `'RETURNED'` / `'OVERDUE'`     |
 | Fines            | Separate `Fine` model (`is_paid`, `paid_at`) |
 | Book copies      | `BookCopy.accession_number`, `status` (`'AVAILABLE'` / `'BORROWED'` / `'MAINTENANCE'`) |
-| Book category    | Plain `CharField` on `Book` — no Category model, no FK |
+| Book category    | FK to `catalog.Category` (`name`, `description`, `icon_name`) |
 | Book copy counts | Derived from `BookCopy` rows (annotations) — never stored on `Book` |
 | User roles       | `'STUDENT'` / `'LECTURER'` / `'OUTSIDER'` / `'STAFF'` |
 | User identity    | `identification_number`, `phone_number` (plus `student_id` / `department` for the dashboard) |
 | "Is a librarian?"| `user.role == 'STAFF'` (via `user.is_librarian()`) |
 | Return processing| `Loan.mark_returned()` — views never do fine math or copy bookkeeping |
+
+> **🚩 FLAG — for Ngbiche / whoever owns `catalog/models.py`:** the current `catalog.Book` model is **missing `publisher` and `cover_url`** (please also confirm `publication_year` and `description` exist). `BookForm`, `book_list.html`, and `book_detail.html` all render these fields; without them the book add/edit views and catalog pages will fail. Please add `publisher` (CharField) and `cover_url` (URLField, blank) to `catalog.Book`.
 
 Status note: loans are created `'ACTIVE'`, flagged `'OVERDUE'` (by the notifications module or when past `due_date`), and set to `'RETURNED'` via `loan.mark_returned()`. The dashboard treats every loan not `'RETURNED'` as outstanding and detects overdue via `due_date < today`. Copy statuses use `'AVAILABLE'` / `'BORROWED'` / `'MAINTENANCE'` exactly — never `ON_LOAN`. Availability counts per title are computed with `Book.objects.annotate(available_copies=Count('copies', filter=Q(copies__status='AVAILABLE')))`.
 
